@@ -85,6 +85,38 @@ const CATEGORIES_MAPPING: { [key: string]: { label: string; agencyId: number } }
   other: { label: "Boshqa muammolar", agencyId: 1 } // Hokimlik
 };
 
+// Rules-based keyword classifier — the deterministic fallback used whenever
+// Gemini is unavailable, and reused by the seed generator so seeded appeals are
+// categorised the same way the live system would categorise them.
+function classifyByKeywords(text: string): { category: string; priority: "high" | "medium" } {
+  const txt = text.toLowerCase();
+  let category = "other";
+
+  if (txt.includes("yorit") || txt.includes("chiroq") || txt.includes("svet") || txt.includes("qorong'u")) {
+    category = "street_lighting";
+  } else if (txt.includes("suv") || txt.includes("quvur") || txt.includes("kran") || txt.includes("uzildi")) {
+    category = "water_supply";
+  } else if (txt.includes("kanaliz") || txt.includes("oqova") || txt.includes("shlang") || txt.includes("toshdi")) {
+    category = "sewerage";
+  } else if (txt.includes("chiqindi") || txt.includes("axlat") || txt.includes("tozala") || txt.includes("musor")) {
+    category = "waste";
+  } else if (txt.includes("gaz") || txt.includes("issiq") || txt.includes("otop") || txt.includes("pech")) {
+    category = "heating_gas";
+  } else if (txt.includes("yo'l") || txt.includes("asfalt") || txt.includes("chuqur") || txt.includes("pothole")) {
+    category = "roads";
+  } else if (txt.includes("kasal") || txt.includes("shifokor") || txt.includes("polikl") || txt.includes("vrach") || txt.includes("dori")) {
+    category = "healthcare";
+  } else if (txt.includes("bog'cha") || txt.includes("maktab") || txt.includes("sinf") || txt.includes("o'qit")) {
+    category = "preschool_education";
+  } else if (txt.includes("milits") || txt.includes("tartib") || txt.includes("bezori") || txt.includes("ichki ishlar") || txt.includes("shovqin")) {
+    category = "public_order";
+  }
+
+  const priority: "high" | "medium" = (txt.includes("shoshilinch") || txt.includes("xavf") || txt.includes("avariya")) ? "high" : "medium";
+
+  return { category, priority };
+}
+
 // Users database simulation
 const users: { [token: string]: any } = {};
 const pendingOtps: { [phone: string]: { code: string; expiresAt: number } } = {};
@@ -568,28 +600,7 @@ Faqat JSON qaytarilsin va hech qanday markdown formatlash (masalan, \`\`\`json) 
   }
 
   // Rules-based fallback (or if Gemini key missing/fails)
-  let cat = "other";
-  const txt = text.toLowerCase();
-  
-  if (txt.includes("yorit") || txt.includes("chiroq") || txt.includes("svet") || txt.includes("qorong'u")) {
-    cat = "street_lighting";
-  } else if (txt.includes("suv") || txt.includes("quvur") || txt.includes("kran") || txt.includes("uzildi")) {
-    cat = "water_supply";
-  } else if (txt.includes("kanaliz") || txt.includes("oqova") || txt.includes("shlang") || txt.includes("toshdi")) {
-    cat = "sewerage";
-  } else if (txt.includes("chiqindi") || txt.includes("axlat") || txt.includes("tozala") || txt.includes("musor")) {
-    cat = "waste";
-  } else if (txt.includes("gaz") || txt.includes("issiq") || txt.includes("otop") || txt.includes("pech")) {
-    cat = "heating_gas";
-  } else if (txt.includes("yo'l") || txt.includes("asfalt") || txt.includes("chuqur") || txt.includes("pothole")) {
-    cat = "roads";
-  } else if (txt.includes("kasal") || txt.includes("shifokor") || txt.includes("polikl") || txt.includes("vrach") || txt.includes("dori")) {
-    cat = "healthcare";
-  } else if (txt.includes("bog'cha") || txt.includes("maktab") || txt.includes("sinf") || txt.includes("o'qit")) {
-    cat = "preschool_education";
-  } else if (txt.includes("milits") || txt.includes("tartib") || txt.includes("bezori") || txt.includes("ichki ishlar") || txt.includes("shovqin")) {
-    cat = "public_order";
-  }
+  const { category: cat, priority } = classifyByKeywords(text);
 
   const mapping = CATEGORIES_MAPPING[cat];
   const agencyObj = AGENCIES.find(a => a.id === mapping.agencyId) || AGENCIES[0];
@@ -600,8 +611,8 @@ Faqat JSON qaytarilsin va hech qanday markdown formatlash (masalan, \`\`\`json) 
     category: cat,
     category_label: mapping.label,
     agency: agencyObj,
-    priority: txt.includes("shoshilinch") || txt.includes("xavf") || txt.includes("avariya") ? "high" : "medium",
-    priority_label: txt.includes("shoshilinch") || txt.includes("xavf") || txt.includes("avariya") ? "Yuqori" : "O'rta",
+    priority,
+    priority_label: priority === "high" ? "Yuqori" : "O'rta",
     summary: summaryText,
     confidence: 0.85,
     source: "ai_accepted"
