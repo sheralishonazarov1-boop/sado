@@ -1,0 +1,6 @@
+{
+  "name": "SADO",
+  "description": "SADO — Fuqaro murojaatlari platformasi. Smart citizen-appeals platform for the Khorezm region of Uzbekistan, utilizing AI for automated category classification and agency routing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
