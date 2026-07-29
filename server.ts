@@ -201,6 +201,20 @@ app.get("/api/regions", (req, res) => {
 
 // --- AI OPERATIONS ---
 
+// Venue wifi, a rate limit, or a bad key must never hang a request — every AI
+// endpoint degrades to local rule-based logic within this window instead.
+const AI_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 async function generateContentWithFallback(params: {
   contents: any;
   config?: any;
@@ -211,29 +225,37 @@ async function generateContentWithFallback(params: {
     throw new Error("Gemini AI client not initialized.");
   }
   try {
-    return await ai.models.generateContent({
-      model: modelToUse,
-      contents: params.contents,
-      config: params.config,
-    });
+    return await withTimeout(
+      ai.models.generateContent({
+        model: modelToUse,
+        contents: params.contents,
+        config: params.config,
+      }),
+      AI_TIMEOUT_MS,
+      `Gemini (${modelToUse})`
+    );
   } catch (err: any) {
     console.warn(`Gemini call failed with model ${modelToUse}:`, err?.message || err);
     const errMsg = String(err?.message || "").toLowerCase();
-    const isServiceError = errMsg.includes("503") || 
-                          errMsg.includes("unavailable") || 
-                          errMsg.includes("limit") || 
-                          errMsg.includes("demand") || 
+    const isServiceError = errMsg.includes("503") ||
+                          errMsg.includes("unavailable") ||
+                          errMsg.includes("limit") ||
+                          errMsg.includes("demand") ||
                           errMsg.includes("rate") ||
                           errMsg.includes("429");
-                          
+
     if (isServiceError && modelToUse !== "gemini-3.1-flash-lite") {
       console.log("Attempting fallback to gemini-3.1-flash-lite due to service constraints/overload...");
       try {
-        return await ai.models.generateContent({
-          model: "gemini-3.1-flash-lite",
-          contents: params.contents,
-          config: params.config,
-        });
+        return await withTimeout(
+          ai.models.generateContent({
+            model: "gemini-3.1-flash-lite",
+            contents: params.contents,
+            config: params.config,
+          }),
+          AI_TIMEOUT_MS,
+          "Gemini (gemini-3.1-flash-lite)"
+        );
       } catch (fallbackErr) {
         console.error("Fallback to gemini-3.1-flash-lite also failed:", fallbackErr);
         throw err;
