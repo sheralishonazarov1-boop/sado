@@ -7,30 +7,164 @@
 // and can be imported by server.ts without a circular dependency)
 // ==========================================
 
+// Xorazm is the pilot region and gets full tuman/mahalla detail. The other 13
+// viloyats exist so the platform visibly scales beyond the pilot (CLAUDE.md),
+// each with one placeholder tuman/mahalla so a citizen who picks one during
+// registration never hits an empty dropdown.
 export const REGIONS = [
+  // Viloyats — verified against uz.wikipedia.org/wiki/O'zbekiston_viloyatlari:
+  // 12 viloyats + Qoraqalpog'iston Respublikasi + Toshkent shahri (its own
+  // administrative unit, distinct from Toshkent viloyati) = 14 total.
   { id: 1, name: "Xorazm viloyati", level: "viloyat" },
+  { id: 2, name: "Qoraqalpog'iston Respublikasi", level: "viloyat" },
+  { id: 3, name: "Andijon viloyati", level: "viloyat" },
+  { id: 4, name: "Buxoro viloyati", level: "viloyat" },
+  { id: 5, name: "Farg'ona viloyati", level: "viloyat" },
+  { id: 6, name: "Jizzax viloyati", level: "viloyat" },
+  { id: 7, name: "Namangan viloyati", level: "viloyat" },
+  { id: 8, name: "Navoiy viloyati", level: "viloyat" },
+  { id: 9, name: "Qashqadaryo viloyati", level: "viloyat" },
+  { id: 10, name: "Samarqand viloyati", level: "viloyat" },
+  { id: 11, name: "Sirdaryo viloyati", level: "viloyat" },
+  { id: 12, name: "Surxondaryo viloyati", level: "viloyat" },
+  { id: 13, name: "Toshkent viloyati", level: "viloyat" },
+  { id: 14, name: "Toshkent shahri", level: "viloyat" },
 
-  // Tumans
-  { id: 11, name: "Urganch shahri", level: "tuman", parent_id: 1 },
-  { id: 12, name: "Xiva shahri", level: "tuman", parent_id: 1 },
-  { id: 13, name: "Gurlan tumani", level: "tuman", parent_id: 1 },
-  { id: 14, name: "Shovot tumani", level: "tuman", parent_id: 1 },
-  { id: 15, name: "Qo'shko'pir tumani", level: "tuman", parent_id: 1 },
+  // Xorazm tumans — verified against uz.wikipedia.org/wiki/Xorazm_viloyati:
+  // 11 tumans + Urganch shahri + Xiva shahri (cities, administratively
+  // distinct from the like-named rural tumans) = 13.
+  { id: 21, name: "Urganch shahri", level: "tuman", parent_id: 1 },
+  { id: 22, name: "Xiva shahri", level: "tuman", parent_id: 1 },
+  { id: 23, name: "Bog'ot tumani", level: "tuman", parent_id: 1 },
+  { id: 24, name: "Gurlan tumani", level: "tuman", parent_id: 1 },
+  { id: 25, name: "Xonqa tumani", level: "tuman", parent_id: 1 },
+  { id: 26, name: "Hazorasp tumani", level: "tuman", parent_id: 1 },
+  { id: 27, name: "Qo'shko'pir tumani", level: "tuman", parent_id: 1 },
+  { id: 28, name: "Shovot tumani", level: "tuman", parent_id: 1 },
+  { id: 29, name: "Urganch tumani", level: "tuman", parent_id: 1 },
+  { id: 30, name: "Yangiariq tumani", level: "tuman", parent_id: 1 },
+  { id: 31, name: "Yangibozor tumani", level: "tuman", parent_id: 1 },
+  { id: 32, name: "Tuproqqal'a tumani", level: "tuman", parent_id: 1 },
+  { id: 33, name: "Xiva tumani", level: "tuman", parent_id: 1 },
+
+  // One placeholder tuman per other viloyat.
+  { id: 40, name: "Boshqa", level: "tuman", parent_id: 2 },
+  { id: 41, name: "Boshqa", level: "tuman", parent_id: 3 },
+  { id: 42, name: "Boshqa", level: "tuman", parent_id: 4 },
+  { id: 43, name: "Boshqa", level: "tuman", parent_id: 5 },
+  { id: 44, name: "Boshqa", level: "tuman", parent_id: 6 },
+  { id: 45, name: "Boshqa", level: "tuman", parent_id: 7 },
+  { id: 46, name: "Boshqa", level: "tuman", parent_id: 8 },
+  { id: 47, name: "Boshqa", level: "tuman", parent_id: 9 },
+  { id: 48, name: "Boshqa", level: "tuman", parent_id: 10 },
+  { id: 49, name: "Boshqa", level: "tuman", parent_id: 11 },
+  { id: 50, name: "Boshqa", level: "tuman", parent_id: 12 },
+  { id: 51, name: "Boshqa", level: "tuman", parent_id: 13 },
+  { id: 52, name: "Boshqa", level: "tuman", parent_id: 14 },
 
   // Mahallalar for Urganch shahri
-  { id: 101, name: "Al-Xorazmiy MFY", level: "mahalla", parent_id: 11 },
-  { id: 102, name: "Jaloliddin Manguberdi MFY", level: "mahalla", parent_id: 11 },
-  { id: 103, name: "Tinchlik MFY", level: "mahalla", parent_id: 11 },
-  { id: 104, name: "Obod Mahalla MFY", level: "mahalla", parent_id: 11 },
+  { id: 210, name: "Al-Xorazmiy MFY", level: "mahalla", parent_id: 21 },
+  { id: 211, name: "Jaloliddin Manguberdi MFY", level: "mahalla", parent_id: 21 },
+  { id: 212, name: "Tinchlik MFY", level: "mahalla", parent_id: 21 },
+  { id: 213, name: "Obod Mahalla MFY", level: "mahalla", parent_id: 21 },
+  { id: 214, name: "Yubileyniy MFY", level: "mahalla", parent_id: 21 },
+  { id: 215, name: "Guliston MFY", level: "mahalla", parent_id: 21 },
+  { id: 216, name: "Istiqlol MFY", level: "mahalla", parent_id: 21 },
+  { id: 217, name: "Mustaqillik MFY", level: "mahalla", parent_id: 21 },
+  { id: 218, name: "Yoshlik MFY", level: "mahalla", parent_id: 21 },
+  { id: 219, name: "Paxtakor MFY", level: "mahalla", parent_id: 21 },
+  { id: 220, name: "Navro'z MFY", level: "mahalla", parent_id: 21 },
+  { id: 221, name: "Boshqa", level: "mahalla", parent_id: 21 },
 
   // Mahallalar for Xiva shahri
-  { id: 111, name: "Ichan-Qal'a MFY", level: "mahalla", parent_id: 12 },
-  { id: 112, name: "Kaltaminor MFY", level: "mahalla", parent_id: 12 },
-  { id: 113, name: "Polvon yop MFY", level: "mahalla", parent_id: 12 },
+  { id: 230, name: "Ichan-Qal'a MFY", level: "mahalla", parent_id: 22 },
+  { id: 231, name: "Kaltaminor MFY", level: "mahalla", parent_id: 22 },
+  { id: 232, name: "Polvon yop MFY", level: "mahalla", parent_id: 22 },
+  { id: 233, name: "Dishon Qal'a MFY", level: "mahalla", parent_id: 22 },
+  { id: 234, name: "Bog'iston MFY", level: "mahalla", parent_id: 22 },
+  { id: 235, name: "Feruz MFY", level: "mahalla", parent_id: 22 },
+  { id: 236, name: "Islomxo'ja MFY", level: "mahalla", parent_id: 22 },
+  { id: 237, name: "Ko'hna Ark MFY", level: "mahalla", parent_id: 22 },
+  { id: 238, name: "Pahlavon Mahmud MFY", level: "mahalla", parent_id: 22 },
+  { id: 239, name: "Nurillabek MFY", level: "mahalla", parent_id: 22 },
+  { id: 240, name: "Boshqa", level: "mahalla", parent_id: 22 },
+
+  // Mahallalar for Bog'ot tumani
+  { id: 250, name: "Bog'ot Markaz MFY", level: "mahalla", parent_id: 23 },
+  { id: 251, name: "Do'stlik MFY", level: "mahalla", parent_id: 23 },
+  { id: 252, name: "Yangiobod MFY", level: "mahalla", parent_id: 23 },
+  { id: 253, name: "Boshqa", level: "mahalla", parent_id: 23 },
 
   // Mahallalar for Gurlan tumani
-  { id: 121, name: "Bo'ston MFY", level: "mahalla", parent_id: 13 },
-  { id: 122, name: "Vatanparvar MFY", level: "mahalla", parent_id: 13 }
+  { id: 260, name: "Bo'ston MFY", level: "mahalla", parent_id: 24 },
+  { id: 261, name: "Vatanparvar MFY", level: "mahalla", parent_id: 24 },
+  { id: 262, name: "Gurlan Markaz MFY", level: "mahalla", parent_id: 24 },
+  { id: 263, name: "Boshqa", level: "mahalla", parent_id: 24 },
+
+  // Mahallalar for Xonqa tumani
+  { id: 270, name: "Xonqa Markaz MFY", level: "mahalla", parent_id: 25 },
+  { id: 271, name: "Norbo'ta MFY", level: "mahalla", parent_id: 25 },
+  { id: 272, name: "Chinor MFY", level: "mahalla", parent_id: 25 },
+  { id: 273, name: "Boshqa", level: "mahalla", parent_id: 25 },
+
+  // Mahallalar for Hazorasp tumani
+  { id: 280, name: "Hazorasp Markaz MFY", level: "mahalla", parent_id: 26 },
+  { id: 281, name: "Guliston MFY", level: "mahalla", parent_id: 26 },
+  { id: 282, name: "Paxtazor MFY", level: "mahalla", parent_id: 26 },
+  { id: 283, name: "Boshqa", level: "mahalla", parent_id: 26 },
+
+  // Mahallalar for Qo'shko'pir tumani
+  { id: 290, name: "Qo'shko'pir Markaz MFY", level: "mahalla", parent_id: 27 },
+  { id: 291, name: "Yangiyer MFY", level: "mahalla", parent_id: 27 },
+  { id: 292, name: "Do'stlik MFY", level: "mahalla", parent_id: 27 },
+  { id: 293, name: "Boshqa", level: "mahalla", parent_id: 27 },
+
+  // Mahallalar for Shovot tumani
+  { id: 300, name: "Shovot Markaz MFY", level: "mahalla", parent_id: 28 },
+  { id: 301, name: "Ko'kcha MFY", level: "mahalla", parent_id: 28 },
+  { id: 302, name: "Yangi Hayot MFY", level: "mahalla", parent_id: 28 },
+  { id: 303, name: "Boshqa", level: "mahalla", parent_id: 28 },
+
+  // Mahallalar for Urganch tumani
+  { id: 310, name: "Qorovul MFY", level: "mahalla", parent_id: 29 },
+  { id: 311, name: "Boston MFY", level: "mahalla", parent_id: 29 },
+  { id: 312, name: "Chinor MFY", level: "mahalla", parent_id: 29 },
+  { id: 313, name: "Boshqa", level: "mahalla", parent_id: 29 },
+
+  // Mahallalar for Yangiariq tumani
+  { id: 320, name: "Yangiariq Markaz MFY", level: "mahalla", parent_id: 30 },
+  { id: 321, name: "Paxtakor MFY", level: "mahalla", parent_id: 30 },
+  { id: 322, name: "Boshqa", level: "mahalla", parent_id: 30 },
+
+  // Mahallalar for Yangibozor tumani
+  { id: 330, name: "Yangibozor Markaz MFY", level: "mahalla", parent_id: 31 },
+  { id: 331, name: "Do'stlik MFY", level: "mahalla", parent_id: 31 },
+  { id: 332, name: "Boshqa", level: "mahalla", parent_id: 31 },
+
+  // Mahallalar for Tuproqqal'a tumani
+  { id: 340, name: "Pitnak MFY", level: "mahalla", parent_id: 32 },
+  { id: 341, name: "Guliston MFY", level: "mahalla", parent_id: 32 },
+  { id: 342, name: "Boshqa", level: "mahalla", parent_id: 32 },
+
+  // Mahallalar for Xiva tumani
+  { id: 350, name: "Yangi Xiva MFY", level: "mahalla", parent_id: 33 },
+  { id: 351, name: "Bog'iston MFY", level: "mahalla", parent_id: 33 },
+  { id: 352, name: "Boshqa", level: "mahalla", parent_id: 33 },
+
+  // One placeholder mahalla per other viloyat's placeholder tuman.
+  { id: 400, name: "Boshqa", level: "mahalla", parent_id: 40 },
+  { id: 401, name: "Boshqa", level: "mahalla", parent_id: 41 },
+  { id: 402, name: "Boshqa", level: "mahalla", parent_id: 42 },
+  { id: 403, name: "Boshqa", level: "mahalla", parent_id: 43 },
+  { id: 404, name: "Boshqa", level: "mahalla", parent_id: 44 },
+  { id: 405, name: "Boshqa", level: "mahalla", parent_id: 45 },
+  { id: 406, name: "Boshqa", level: "mahalla", parent_id: 46 },
+  { id: 407, name: "Boshqa", level: "mahalla", parent_id: 47 },
+  { id: 408, name: "Boshqa", level: "mahalla", parent_id: 48 },
+  { id: 409, name: "Boshqa", level: "mahalla", parent_id: 49 },
+  { id: 410, name: "Boshqa", level: "mahalla", parent_id: 50 },
+  { id: 411, name: "Boshqa", level: "mahalla", parent_id: 51 },
+  { id: 412, name: "Boshqa", level: "mahalla", parent_id: 52 }
 ];
 
 export const AGENCIES = [
@@ -174,12 +308,18 @@ const STREET_NAMES = [
   "Navoiy", "Istiqlol", "Do'stlik", "Bunyodkor", "Yoshlik", "Mirzo Ulug'bek"
 ];
 
+// Only real Xorazm mahallas (never a "Boshqa" placeholder, never another
+// viloyat's) get used for generated appeal locations — seed data should read
+// like specific real submissions, and every generated appeal stays within the
+// pilot region regardless of how much geography exists above it.
 const MAHALLA_TUMAN_PAIRS = REGIONS
-  .filter(r => r.level === "mahalla")
+  .filter(r => r.level === "mahalla" && r.name !== "Boshqa")
   .map(m => ({
     mahalla: m.name,
-    tuman: REGIONS.find(t => t.id === (m as any).parent_id)!.name
-  }));
+    tuman: REGIONS.find(t => t.id === (m as any).parent_id)!
+  }))
+  .filter(pair => pair.tuman.parent_id === 1)
+  .map(pair => ({ mahalla: pair.mahalla, tuman: pair.tuman.name }));
 
 const SIGNATURE_TEMPLATES = [
   " Murojaatchi: {name}, aloqa uchun telefon: {phone}.",
