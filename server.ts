@@ -468,6 +468,24 @@ Javobni JSON ko'rinishida qaytaring:
 
 // --- APPEALS ---
 
+// Every appeal object leaving the server goes through here: strips internal
+// fields (the owner's bearer token, the raw list of who's cosigned) that must
+// never reach another citizen or an admin, and computes has_cosigned/can_cosign
+// relative to whoever is actually asking — not a single global flag on the
+// appeal itself, which would let the FIRST person to cosign lock everyone else
+// out ("already joined") and would leak every subsequent viewer's join state
+// to every other citizen via /api/me/appeals.
+function serializeAppeal(appeal: any, viewerToken?: string) {
+  const { user_token, cosigned_by, ...rest } = appeal;
+  const cosignedList: string[] = cosigned_by || [];
+  const hasCosigned = !!viewerToken && cosignedList.includes(viewerToken);
+  return {
+    ...rest,
+    has_cosigned: hasCosigned,
+    can_cosign: appeal.status !== "done" && !hasCosigned
+  };
+}
+
 app.post("/api/appeals", requireAuth, (req, res) => {
   const {
     text,
@@ -518,8 +536,7 @@ app.post("/api/appeals", requireAuth, (req, res) => {
     ai_suggested_category: ai_suggested_category || category,
     ai_confidence: 0.90,
     cosign_count: 0,
-    has_cosigned: false,
-    can_cosign: true,
+    cosigned_by: [] as string[],
     escalated_at: null,
     rating_stars: null,
     photo_base64: photo_base64 || null,
@@ -544,7 +561,7 @@ app.post("/api/appeals", requireAuth, (req, res) => {
     { label: "Murojaat yo'naltirildi", note: `${agencyObj.name}ga ko'rib chiqish uchun yuborildi`, time: now.toISOString() }
   ];
 
-  res.status(201).json(newAppeal);
+  res.status(201).json(serializeAppeal(newAppeal, req.headers.authorization?.split(" ")[1]));
 });
 
 app.get("/api/appeals/similar", requireAuth, (req, res) => {
@@ -572,11 +589,9 @@ app.get("/api/appeals/similar", requireAuth, (req, res) => {
   // Limit to most similar 3
   items = items.slice(0, 3);
 
+  const token = req.headers.authorization?.split(" ")[1];
   res.json({
-    items: items.map(i => ({
-      ...i,
-      can_cosign: !i.has_cosigned && i.status !== "done"
-    })),
+    items: items.map(i => serializeAppeal(i, token)),
     counts_for_escalation: 10 // Need 10 joins to escalate
   });
 });
@@ -591,13 +606,14 @@ app.post("/api/appeals/:id/cosign", requireAuth, (req, res) => {
 
   const token = req.headers.authorization?.split(" ")[1] || '';
 
-  if (appeal.has_cosigned) {
+  if (!appeal.cosigned_by) appeal.cosigned_by = [];
+
+  if (appeal.cosigned_by.includes(token)) {
     return res.status(400).json({ detail: "Siz ushbu murojaatga allaqachon qo'shilgansiz." });
   }
 
+  appeal.cosigned_by.push(token);
   appeal.cosign_count += 1;
-  appeal.has_cosigned = true;
-  appeal.can_cosign = false;
 
   // Escalate automatically if exceeds 10 joins
   if (appeal.cosign_count >= 10 && !appeal.escalated_at) {
@@ -624,7 +640,7 @@ app.post("/api/appeals/:id/cosign", requireAuth, (req, res) => {
     }
   }
 
-  res.json(appeal);
+  res.json(serializeAppeal(appeal, token));
 });
 
 app.delete("/api/appeals/:id/cosign", requireAuth, (req, res) => {
@@ -635,13 +651,14 @@ app.delete("/api/appeals/:id/cosign", requireAuth, (req, res) => {
     return res.status(404).json({ detail: "Murojaat topilmadi." });
   }
 
-  if (!appeal.has_cosigned) {
+  const token = req.headers.authorization?.split(" ")[1] || '';
+
+  if (!(appeal as any).cosigned_by?.includes(token)) {
     return res.status(400).json({ detail: "Siz ushbu murojaatga qo'shilmagansiz." });
   }
 
+  (appeal as any).cosigned_by = (appeal as any).cosigned_by.filter((t: string) => t !== token);
   appeal.cosign_count = Math.max(0, appeal.cosign_count - 1);
-  appeal.has_cosigned = false;
-  appeal.can_cosign = true;
 
   if (TIMELINES[id]) {
     TIMELINES[id].push({
@@ -651,7 +668,7 @@ app.delete("/api/appeals/:id/cosign", requireAuth, (req, res) => {
     });
   }
 
-  res.json(appeal);
+  res.json(serializeAppeal(appeal, token));
 });
 
 app.post("/api/appeals/:id/rating", requireAuth, (req, res) => {
@@ -678,7 +695,7 @@ app.post("/api/appeals/:id/rating", requireAuth, (req, res) => {
     });
   }
 
-  res.json(appeal);
+  res.json(serializeAppeal(appeal, req.headers.authorization?.split(" ")[1]));
 });
 
 app.get("/api/appeals/:id", requireAuth, (req, res) => {
@@ -693,7 +710,7 @@ app.get("/api/appeals/:id", requireAuth, (req, res) => {
   const timeline = TIMELINES[id] || [];
 
   res.json({
-    ...appeal,
+    ...serializeAppeal(appeal, req.headers.authorization?.split(" ")[1]),
     timeline
   });
 });
@@ -704,10 +721,10 @@ app.get("/api/me/appeals", requireAuth, (req, res) => {
   const { status, category, q } = req.query;
   const token = req.headers.authorization?.split(" ")[1] || '';
 
-  // Filter: either created by this user or they have co-signed it (has_cosigned is true)
+  // Filter: either created by this user or they've co-signed it
   let items = appealsList.filter(a => {
     const isOwner = (a as any).user_token === token;
-    const isCosigner = a.has_cosigned === true;
+    const isCosigner = (a as any).cosigned_by?.includes(token) === true;
     return isOwner || isCosigner || a.id === 1001 || a.id === 1004; // fallback seeded links to keep active
   });
 
@@ -726,7 +743,7 @@ app.get("/api/me/appeals", requireAuth, (req, res) => {
     total: items.length,
     limit: 100,
     offset: 0,
-    items
+    items: items.map(a => serializeAppeal(a, token))
   });
 });
 
@@ -736,7 +753,7 @@ app.get("/api/me/stats", requireAuth, (req, res) => {
   // Filter user's appeals
   const userAppeals = appealsList.filter(a => {
     const isOwner = (a as any).user_token === token;
-    const isCosigner = a.has_cosigned === true;
+    const isCosigner = (a as any).cosigned_by?.includes(token) === true;
     return isOwner || isCosigner || a.id === 1001 || a.id === 1004;
   });
 
@@ -766,7 +783,7 @@ app.get("/api/me/stats", requireAuth, (req, res) => {
     };
   }
 
-  const cosigned = userAppeals.filter(a => a.has_cosigned).length;
+  const cosigned = userAppeals.filter(a => (a as any).cosigned_by?.includes(token)).length;
 
   res.json({
     total: userAppeals.length,
@@ -1063,7 +1080,7 @@ app.get("/api/admin/appeals", requireAdminAuth, (req, res) => {
     total,
     limit: Number(limit),
     offset: Number(offset),
-    items: paginated
+    items: paginated.map(a => serializeAppeal(a))
   });
 });
 
@@ -1080,9 +1097,9 @@ app.get("/api/admin/appeals/:id", requireAdminAuth, (req, res) => {
   }
 
   const timeline = TIMELINES[id] || [];
-  
+
   res.json({
-    appeal,
+    appeal: serializeAppeal(appeal),
     timeline,
     cosigners: []
   });
@@ -1127,7 +1144,7 @@ app.patch("/api/admin/appeals/:id/status", requireAdminAuth, (req, res) => {
 
   logAudit(user, "update_status", "appeal", String(id), `Holat o'zgardi: ${status}. Izoh: ${note || '-'}`);
 
-  res.json(appeal);
+  res.json(serializeAppeal(appeal));
 });
 
 app.patch("/api/admin/appeals/:id/assign", requireAdminAuth, (req, res) => {
@@ -1166,7 +1183,7 @@ app.patch("/api/admin/appeals/:id/assign", requireAdminAuth, (req, res) => {
 
   logAudit(user, "assign", "appeal", String(id), `Mas'ul tayinlandi: ${targetStaff.full_name}`);
 
-  res.json(appeal);
+  res.json(serializeAppeal(appeal));
 });
 
 app.post("/api/admin/appeals/:id/reassign", requireAdminAuth, (req, res) => {
@@ -1205,7 +1222,7 @@ app.post("/api/admin/appeals/:id/reassign", requireAdminAuth, (req, res) => {
 
   logAudit(user, "reassign", "appeal", String(id), `${oldAgencyName} -> ${targetAgency.name}. Sabab: ${reason}`);
 
-  res.json(appeal);
+  res.json(serializeAppeal(appeal));
 });
 
 app.post("/api/admin/appeals/:id/note", requireAdminAuth, (req, res) => {
