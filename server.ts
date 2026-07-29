@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import cors from "cors";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -899,6 +900,29 @@ function toPublicUser(u: any) {
   };
 }
 
+function hashPassword(password: string): { salt: string; hash: string } {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return { salt, hash };
+}
+
+function verifyPassword(password: string, salt: string, hash: string): boolean {
+  if (!salt || !hash) return false;
+  const candidate = crypto.scryptSync(password, salt, 64);
+  const stored = Buffer.from(hash, "hex");
+  return candidate.length === stored.length && crypto.timingSafeEqual(candidate, stored);
+}
+
+// Seeded accounts come in with plaintext passwords (see seed.ts / CLAUDE.md's
+// demo credentials table) — hash them once at startup and never keep the
+// plaintext in memory afterward.
+adminUsers.forEach((u: any) => {
+  const { salt, hash } = hashPassword(u.password);
+  u.password_salt = salt;
+  u.password_hash = hash;
+  delete u.password;
+});
+
 // Admin Auth Middleware
 const requireAdminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -921,8 +945,8 @@ app.post("/api/admin/auth/login", (req, res) => {
     return res.status(400).json({ detail: "Login va parol kiritilishi shart." });
   }
 
-  const user = adminUsers.find(u => u.username === username && u.password === password);
-  if (!user) {
+  const user = adminUsers.find(u => u.username === username);
+  if (!user || !verifyPassword(password, (user as any).password_salt, (user as any).password_hash)) {
     return res.status(401).json({ detail: "Login yoki parol noto'g'ri" });
   }
   if (!user.is_active) {
@@ -1461,10 +1485,12 @@ app.post("/api/admin/users", requireAdminAuth, (req, res) => {
   const targetAgency = AGENCIES.find(a => a.id === targetAgencyId) || creator.agency;
 
   const newId = adminUsers.length > 0 ? Math.max(...adminUsers.map(u => u.id)) + 1 : 1;
+  const { salt, hash } = hashPassword(password);
   const newStaff = {
     id: newId,
     username,
-    password,
+    password_salt: salt,
+    password_hash: hash,
     full_name,
     role,
     is_active: true,
@@ -1523,7 +1549,9 @@ app.post("/api/admin/users/:id/reset-password", requireAdminAuth, (req, res) => 
   }
 
   const tempPassword = `SadoTemp${Math.floor(100 + Math.random() * 900)}`;
-  target.password = tempPassword;
+  const { salt, hash } = hashPassword(tempPassword);
+  (target as any).password_salt = salt;
+  (target as any).password_hash = hash;
 
   logAudit(actor, "reset_password", "user", String(id), `Parol qayta o'rnatildi: ${target.full_name}`);
 

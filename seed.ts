@@ -55,7 +55,7 @@ export const CATEGORIES_MAPPING: { [key: string]: { label: string; agencyId: num
   other: { label: "Boshqa muammolar", agencyId: 1 } // Hokimlik
 };
 
-export const adminUsers = [
+export const adminUsers: any[] = [
   {
     id: 1,
     username: "super.admin",
