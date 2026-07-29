@@ -133,7 +133,7 @@ export default function DashboardView({ user, onNavigate, locale }: DashboardVie
 
   // Calculate indicator difference
   const userAvg = stats?.avg_resolution_days || 0;
-  const regionalAvg = 6.8;
+  const regionalAvg = stats?.regional_avg_resolution_days || 0;
   const isFaster = userAvg <= regionalAvg;
   const avgDiff = Math.abs(userAvg - regionalAvg).toFixed(1);
 
@@ -263,13 +263,13 @@ export default function DashboardView({ user, onNavigate, locale }: DashboardVie
                 <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wide">{getTranslation(locale, "dash_your_avg")}</span>
               </div>
               <div className="text-center">
-                <span className="text-2xl font-extrabold font-display text-brand-muted block">{formatDaysCount(regionalAvg)}</span>
+                <span className="text-2xl font-extrabold font-display text-brand-muted block">{regionalAvg ? formatDaysCount(regionalAvg) : '—'}</span>
                 <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wide">{getTranslation(locale, "dash_regional_avg")}</span>
               </div>
             </div>
 
             <div className="flex items-center justify-center space-x-1.5 py-1.5 bg-brand-surface2/30 rounded-lg border border-brand-line/30 mt-1">
-              {userAvg > 0 ? (
+              {userAvg > 0 && regionalAvg > 0 ? (
                 userAvg === regionalAvg ? (
                   <span className="text-xs font-bold text-brand-muted">
                     Hududiy o'rtacha bilan bir xil

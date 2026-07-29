@@ -486,6 +486,54 @@ function serializeAppeal(appeal: any, viewerToken?: string) {
   };
 }
 
+// Real stats instead of hardcoded placeholders (CLAUDE.md 5.4: never render a
+// metric with no data — these return null when the scope has nothing to
+// compute from, and callers must render "—", never a default number).
+function avgResolutionDays(appeals: any[]): number | null {
+  const resolved = appeals.filter(a => a.status === "done" && a.resolved_at);
+  if (resolved.length === 0) return null;
+  const totalDays = resolved.reduce((sum, a) => {
+    const days = (new Date(a.resolved_at).getTime() - new Date(a.created_at).getTime()) / (24 * 60 * 60 * 1000);
+    return sum + days;
+  }, 0);
+  return Number((totalDays / resolved.length).toFixed(1));
+}
+
+function avgSatisfaction(appeals: any[]): number | null {
+  const rated = appeals.filter(a => a.rating_stars !== null && a.rating_stars !== undefined);
+  if (rated.length === 0) return null;
+  return Number((rated.reduce((sum, a) => sum + a.rating_stars, 0) / rated.length).toFixed(1));
+}
+
+function slaRate(appeals: any[]): number | null {
+  if (appeals.length === 0) return null;
+  const breached = appeals.filter(a => (a as any).sla_status === "breached").length;
+  return Math.round((100 * (appeals.length - breached)) / appeals.length);
+}
+
+// Last 6 months of real received/resolved counts within the given scope.
+function monthlyTrend(appeals: any[]): { month: string; label: string; received: number; resolved: number }[] {
+  const monthLabels = ["Yan", "Fev", "Mar", "Apr", "May", "Iyun", "Iyul", "Avg", "Sen", "Okt", "Noy", "Dek"];
+  const monthFullLabels = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"];
+  const now = new Date();
+  const buckets: { month: string; label: string; received: number; resolved: number; year: number; monthIdx: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({ month: monthLabels[d.getMonth()], label: monthFullLabels[d.getMonth()], received: 0, resolved: 0, year: d.getFullYear(), monthIdx: d.getMonth() });
+  }
+  appeals.forEach(a => {
+    const created = new Date(a.created_at);
+    const receivedBucket = buckets.find(b => b.year === created.getFullYear() && b.monthIdx === created.getMonth());
+    if (receivedBucket) receivedBucket.received++;
+    if (a.resolved_at) {
+      const resolved = new Date(a.resolved_at);
+      const resolvedBucket = buckets.find(b => b.year === resolved.getFullYear() && b.monthIdx === resolved.getMonth());
+      if (resolvedBucket) resolvedBucket.resolved++;
+    }
+  });
+  return buckets.map(({ year, monthIdx, ...rest }) => rest);
+}
+
 app.post("/api/appeals", requireAuth, (req, res) => {
   const {
     text,
@@ -549,6 +597,7 @@ app.post("/api/appeals", requireAuth, (req, res) => {
     },
     created_at: now.toISOString(),
     deadline_at: deadline.toISOString(),
+    resolved_at: null,
     // Link token to associate who created it
     user_token: req.headers.authorization?.split(" ")[1]
   };
@@ -788,8 +837,8 @@ app.get("/api/me/stats", requireAuth, (req, res) => {
   res.json({
     total: userAppeals.length,
     by_status: byStatus,
-    avg_resolution_days: 5.4,
-    regional_avg_resolution_days: 7.2,
+    avg_resolution_days: avgResolutionDays(userAppeals),
+    regional_avg_resolution_days: avgResolutionDays(appealsList),
     cosigned_count: cosigned,
     next_deadline: nextDeadline
   });
@@ -846,14 +895,17 @@ app.get("/api/public/stats", (req, res) => {
     byCategory[a.category] = (byCategory[a.category] || 0) + 1;
   });
 
+  const aiAccepted = appealsList.filter(a => (a as any).classification_source === "ai_accepted").length;
+  const aiOverridden = appealsList.filter(a => (a as any).classification_source === "ai_overridden").length;
+
   res.json({
     total,
     by_status: byStatus,
     by_category: byCategory,
     by_agency: byAgency,
-    avg_resolution_days: 6.8,
+    avg_resolution_days: avgResolutionDays(appealsList),
     overdue_count: appealsList.filter(a => a.is_overdue).length,
-    ai_classified_percent: 92.5
+    ai_classified_percent: total > 0 ? Math.round((100 * (aiAccepted + aiOverridden)) / total) : null
   });
 });
 
@@ -864,12 +916,6 @@ app.get("/api/public/agencies", (req, res) => {
     const total = agencyAppeals.length;
     const done = agencyAppeals.filter(a => a.status === "done").length;
     const overdue = agencyAppeals.filter(a => a.is_overdue).length;
-    
-    // Average ratings
-    const rated = agencyAppeals.filter(a => a.rating_stars !== null);
-    const satisfactionAvg = rated.length > 0 
-      ? Number((rated.reduce((sum, a) => sum + (a.rating_stars || 0), 0) / rated.length).toFixed(1))
-      : 4.5; // fallback beautiful standard
 
     return {
       agency_id: agency.id,
@@ -877,9 +923,9 @@ app.get("/api/public/agencies", (req, res) => {
       total,
       done,
       overdue,
-      avg_resolution_days: agency.id === 2 ? 4.8 : agency.id === 4 ? 8.2 : 6.5,
-      resolution_rate: total > 0 ? Math.round((done / total) * 100) : 85,
-      satisfaction_avg: satisfactionAvg
+      avg_resolution_days: avgResolutionDays(agencyAppeals),
+      resolution_rate: total > 0 ? Math.round((done / total) * 100) : null,
+      satisfaction_avg: avgSatisfaction(agencyAppeals)
     };
   });
 
@@ -916,6 +962,7 @@ function logAudit(actor: any, action: string, target_type: string, target_id: st
     id: newId,
     actor_name: actor.full_name,
     actor_role: actor.role,
+    agency_id: actor.agency?.id ?? null,
     action,
     target_type,
     target_id: String(target_id),
@@ -1129,11 +1176,14 @@ app.patch("/api/admin/appeals/:id/status", requireAdminAuth, (req, res) => {
   if (status) {
     appeal.status = status;
     appeal.status_label = statusLabels[status] || status;
+    if (status === "done" && !(appeal as any).resolved_at) {
+      (appeal as any).resolved_at = new Date().toISOString();
+    }
   }
 
   const nowStr = new Date().toISOString();
   if (!TIMELINES[id]) TIMELINES[id] = [];
-  
+
   TIMELINES[id].push({
     label: `Holat o'zgardi: ${statusLabels[status] || status}`,
     note: note || "Mas'ul xodim tomonidan holat o'zgartirildi",
@@ -1286,6 +1336,9 @@ app.post("/api/admin/appeals/bulk-status", requireAdminAuth, (req, res) => {
 
     appeal.status = status;
     appeal.status_label = statusLabels[status] || status;
+    if (status === "done" && !(appeal as any).resolved_at) {
+      (appeal as any).resolved_at = new Date().toISOString();
+    }
 
     if (!TIMELINES[id]) TIMELINES[id] = [];
     TIMELINES[id].push({
@@ -1336,17 +1389,10 @@ app.get("/api/admin/stats/overview", requireAdminAuth, (req, res) => {
     total,
     overdue_count: overdueCount,
     unassigned_count: unassignedCount,
-    avg_resolution_days: user.role === "super_admin" ? 6.5 : user.agency.id === 2 ? 4.8 : 7.2,
-    satisfaction_avg: 4.6,
-    sla_rate: user.role === "super_admin" ? 92 : user.agency.id === 2 ? 95 : 88,
-    trend: [
-      { month: "Fev", label: "Fevral", received: 12, resolved: 8 },
-      { month: "Mar", label: "Mart", received: 19, resolved: 15 },
-      { month: "Apr", label: "Aprel", received: 25, resolved: 20 },
-      { month: "May", label: "May", received: 32, resolved: 28 },
-      { month: "Iun", label: "Iyun", received: 45, resolved: 38 },
-      { month: "Iul", label: "Iyul", received: total + 10, resolved: total }
-    ]
+    avg_resolution_days: avgResolutionDays(scopeAppeals),
+    satisfaction_avg: avgSatisfaction(scopeAppeals),
+    sla_rate: slaRate(scopeAppeals),
+    trend: monthlyTrend(scopeAppeals)
   });
 });
 
@@ -1374,7 +1420,7 @@ app.get("/api/admin/stats/team", requireAdminAuth, (req, res) => {
       assigned: active + done,
       done,
       overdue,
-      avg_resolution_days: u.id % 2 === 0 ? 4.2 : 5.8
+      avg_resolution_days: avgResolutionDays(assignedAppeals)
     };
   });
 
@@ -1399,10 +1445,10 @@ app.get("/api/admin/stats/agencies", requireAdminAuth, (req, res) => {
       total,
       done,
       overdue,
-      avg_resolution_days: agency.id === 2 ? 4.8 : agency.id === 4 ? 8.2 : 6.5,
-      resolution_rate: total > 0 ? Math.round((done / total) * 100) : 85,
-      satisfaction_avg: agency.id === 2 ? 4.8 : 4.4,
-      sla_rate: agency.id === 2 ? 96 : agency.id === 4 ? 85 : 91
+      avg_resolution_days: avgResolutionDays(agencyAppeals),
+      resolution_rate: total > 0 ? Math.round((done / total) * 100) : null,
+      satisfaction_avg: avgSatisfaction(agencyAppeals),
+      sla_rate: slaRate(agencyAppeals)
     };
   });
 
@@ -1600,11 +1646,17 @@ app.get("/api/admin/audit", requireAdminAuth, (req, res) => {
   const actor = (req as any).adminUser;
   const { actor_id, action, limit = 50, offset = 0 } = req.query;
 
-  if (actor.role !== "super_admin") {
-    return res.status(403).json({ detail: "Audit jurnali faqat viloyat rahbariyati (super_admin) uchun ochiq." });
+  // Per CLAUDE.md's role table: operator has no audit access, agency_admin
+  // sees only their own agency's entries, super_admin sees everything.
+  if (actor.role === "operator") {
+    return res.status(403).json({ detail: "Audit jurnaliga ruxsatingiz yo'q." });
   }
 
   let items = [...auditLogs];
+
+  if (actor.role !== "super_admin") {
+    items = items.filter(l => (l as any).agency_id === actor.agency.id);
+  }
 
   if (actor_id) {
     items = items.filter(l => l.actor_id === Number(actor_id));

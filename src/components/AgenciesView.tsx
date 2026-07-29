@@ -115,9 +115,9 @@ export default function AgenciesView({ onNavigate, locale }: AgenciesViewProps) 
           total: 0,
           done: 0,
           overdue: 0,
-          avg_resolution_days: 6.5,
-          resolution_rate: 85,
-          satisfaction_avg: 4.5
+          avg_resolution_days: null,
+          resolution_rate: null,
+          satisfaction_avg: null
         };
         return {
           ...p,
@@ -164,10 +164,11 @@ export default function AgenciesView({ onNavigate, locale }: AgenciesViewProps) 
         return a.name.localeCompare(b.name);
       }
       if (sortBy === "speed") {
-        return a.avg_resolution_days - b.avg_resolution_days; // Faster resolution is smaller days count
+        // No-data agencies sort to the end either direction, never treated as "fastest"
+        return (a.avg_resolution_days ?? Infinity) - (b.avg_resolution_days ?? Infinity);
       }
       if (sortBy === "rating") {
-        return b.satisfaction_avg - a.satisfaction_avg; // Higher average rating first
+        return (b.satisfaction_avg ?? -1) - (a.satisfaction_avg ?? -1);
       }
       return 0;
     });
@@ -175,15 +176,18 @@ export default function AgenciesView({ onNavigate, locale }: AgenciesViewProps) 
     return result;
   };
 
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number | null | undefined) => {
+    if (rating == null) {
+      return <span className="text-[11px] text-brand-dim font-semibold">Ma'lumot yetarli emas</span>;
+    }
     const rounded = Math.round(rating);
     return (
       <div className="flex items-center space-x-0.5 text-brand-accent">
         {Array.from({ length: 5 }).map((_, idx) => (
-          <Icons.Star 
-            key={idx} 
-            size={11} 
-            className={idx < rounded ? "fill-brand-accent stroke-brand-accent" : "stroke-brand-line"} 
+          <Icons.Star
+            key={idx}
+            size={11}
+            className={idx < rounded ? "fill-brand-accent stroke-brand-accent" : "stroke-brand-line"}
           />
         ))}
         <span className="text-[11px] text-brand-muted font-bold ml-1">{rating.toFixed(1)}</span>
@@ -202,7 +206,7 @@ export default function AgenciesView({ onNavigate, locale }: AgenciesViewProps) 
 
   // Trend graph data simulation based on agency speed
   const getTrendData = (agency: any) => {
-    if (!agency) return [];
+    if (!agency || agency.avg_resolution_days == null) return [];
     const baseDays = agency.avg_resolution_days;
     return [
       { name: "Fev", kun: Number((baseDays * 1.3).toFixed(1)) },
@@ -391,7 +395,7 @@ export default function AgenciesView({ onNavigate, locale }: AgenciesViewProps) 
                       <span className="text-[9px] font-bold text-brand-dim uppercase tracking-wider block">Bajarilgan</span>
                       <div className="flex items-baseline justify-between">
                         <span className="text-xl font-extrabold text-brand-accent font-mono">{selectedAgency.done} <span className="text-[10px] text-brand-muted">ta</span></span>
-                        <span className="text-[10px] text-brand-accent font-bold font-mono">+{selectedAgency.resolution_rate}%</span>
+                        <span className="text-[10px] text-brand-accent font-bold font-mono">{selectedAgency.resolution_rate != null ? `+${selectedAgency.resolution_rate}%` : '—'}</span>
                       </div>
                     </div>
 
@@ -402,7 +406,9 @@ export default function AgenciesView({ onNavigate, locale }: AgenciesViewProps) 
 
                     <div className="bg-brand-surface2 border border-brand-line p-4 rounded-xl space-y-1">
                       <span className="text-[9px] font-bold text-brand-dim uppercase tracking-wider block">O'rtacha muddat</span>
-                      <p className="text-xl font-semibold text-[#A78BFA] font-mono">{selectedAgency.avg_resolution_days} <span className="text-[10px] text-brand-muted">kun</span></p>
+                      <p className="text-xl font-semibold text-[#A78BFA] font-mono">
+                        {selectedAgency.avg_resolution_days != null ? <>{selectedAgency.avg_resolution_days} <span className="text-[10px] text-brand-muted">kun</span></> : '—'}
+                      </p>
                     </div>
 
                   </div>

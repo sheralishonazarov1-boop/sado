@@ -56,9 +56,9 @@ export interface PublicStats {
   };
   by_category?: { [key: string]: number };
   by_agency: { [key: string]: number };
-  avg_resolution_days: number;
+  avg_resolution_days: number | null;
   overdue_count: number;
-  ai_classified_percent: number;
+  ai_classified_percent: number | null;
 }
 
 export interface AgencyPerformance {
@@ -67,9 +67,9 @@ export interface AgencyPerformance {
   total: number;
   done: number;
   overdue: number;
-  avg_resolution_days: number;
-  resolution_rate: number; // 0 to 100
-  satisfaction_avg: number; // 0 to 5
+  avg_resolution_days: number | null;
+  resolution_rate: number | null; // 0 to 100
+  satisfaction_avg: number | null; // 0 to 5
 }
 
 export interface PublicFeedItem {
@@ -93,8 +93,8 @@ export interface UserStats {
     in_progress: number;
     done: number;
   };
-  avg_resolution_days: number;
-  regional_avg_resolution_days: number;
+  avg_resolution_days: number | null;
+  regional_avg_resolution_days: number | null;
   cosigned_count: number;
   next_deadline: {
     appeal_id: number;

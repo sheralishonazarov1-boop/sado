@@ -118,12 +118,12 @@ export default function LandingView({ onNavigate }: LandingViewProps) {
             <div className="flex flex-col items-center md:items-start space-y-1 border-t md:border-t-0 md:border-l border-brand-line pt-4 md:pt-0 md:pl-6">
               <div className="flex items-baseline space-x-1">
                 <span className="text-3xl md:text-4xl font-extrabold text-[#A78BFA] font-display">
-                  {stats?.avg_resolution_days || 0}
+                  {stats?.avg_resolution_days != null ? stats.avg_resolution_days : '—'}
                 </span>
-                <span className="text-sm font-medium text-brand-muted">kun</span>
+                {stats?.avg_resolution_days != null && <span className="text-sm font-medium text-brand-muted">kun</span>}
               </div>
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-dim text-center md:text-left">
-                O'rtacha hal etish muddati
+                {stats?.avg_resolution_days != null ? "O'rtacha hal etish muddati" : "Ma'lumot yetarli emas"}
               </span>
             </div>
           </>

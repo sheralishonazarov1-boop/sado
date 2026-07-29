@@ -723,7 +723,8 @@ function buildAppeal(id: number, status: "new" | "reviewing" | "in_progress" | "
       address_detail: `${street} ko'chasi ${houseNo}-uy`
     },
     created_at: createdAt.toISOString(),
-    deadline_at: deadline.toISOString()
+    deadline_at: deadline.toISOString(),
+    resolved_at: resolvedAt ? resolvedAt.toISOString() : null
   };
 
   const timeline = buildTimeline(createdAt, status, resolvedAt, assignedTo, agencyObj.name, ratingStars);
@@ -779,7 +780,8 @@ function buildCentrepiece(id: number): { appeal: any; timeline: any[] } {
       address_detail: "Al-Xorazmiy ko'chasi 14-uy oldida"
     },
     created_at: createdAt.toISOString(),
-    deadline_at: deadline.toISOString()
+    deadline_at: deadline.toISOString(),
+    resolved_at: null
   };
 
   const timeline = [
@@ -800,7 +802,7 @@ function buildCosignedExtra(id: number, status: "new" | "reviewing" | "in_progre
 }
 
 function buildAuditLogs(appeals: any[], timelines: { [id: number]: any[] }): any[] {
-  type Candidate = { actor_name: string; actor_role: string; action: string; target_type: string; target_id: string; detail: string; created_at: string };
+  type Candidate = { actor_name: string; actor_role: string; agency_id: number | null; action: string; target_type: string; target_id: string; detail: string; created_at: string };
   const candidates: Candidate[] = [];
 
   appeals.forEach(a => {
@@ -811,6 +813,7 @@ function buildAuditLogs(appeals: any[], timelines: { [id: number]: any[] }): any
         candidates.push({
           actor_name: entry.actor_name,
           actor_role: staff?.role || "operator",
+          agency_id: staff?.agency?.id ?? a.agency.id,
           action: entry.label.includes("tayinlandi") ? "assign" : "update_status",
           target_type: "appeal",
           target_id: String(a.id),
@@ -825,6 +828,7 @@ function buildAuditLogs(appeals: any[], timelines: { [id: number]: any[] }): any
     candidates.push({
       actor_name: u.full_name,
       actor_role: u.role,
+      agency_id: u.agency?.id ?? null,
       action: "login",
       target_type: "auth",
       target_id: String(u.id),

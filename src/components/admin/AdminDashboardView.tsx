@@ -37,18 +37,18 @@ export default function AdminDashboardView({ user, onNavigate, adminToken }: Adm
       // 4. Get Agencies Stats if super_admin
       if (user.role === 'super_admin') {
         const agenciesData = await adminApi.get<any>("/api/admin/stats/agencies");
-        const sortedAgencies = (agenciesData.items || []).sort((a: any, b: any) => b.sla_rate - a.sla_rate);
+        const sortedAgencies = (agenciesData.items || []).sort((a: any, b: any) => (b.sla_rate ?? -1) - (a.sla_rate ?? -1));
         setAgencyRanking(sortedAgencies);
+      }
 
-        // Fetch Audit Log for Row 4
+      // Recent activity: super_admin sees everything, agency_admin sees their
+      // own agency (both via the real, now-scoped audit endpoint), operator
+      // has no audit access at all — an honest empty list, not fake data.
+      if (user.role !== 'operator') {
         const auditData = await adminApi.get<any>("/api/admin/audit?limit=10");
         setRecentAudit(auditData.items || []);
       } else {
-        // Mock recent activities relevant to agency
-        setRecentAudit([
-          { id: 1, actor_name: "Nilufar Qosimova", actor_role: "operator", action: "update_status", target_id: "1001", detail: "Murojaat holati Ijrodaga o'zgartirildi", created_at: "2026-07-28T08:05:00Z" },
-          { id: 2, actor_name: "Bekzod Yusupov", actor_role: "agency_admin", action: "assign", target_id: "1002", detail: "Mas'ul biriktirildi: Nilufar", created_at: "2026-07-28T07:15:00Z" }
-        ]);
+        setRecentAudit([]);
       }
     } catch (err) {
       console.error("Dashboard statistics loading failed:", err);
@@ -162,14 +162,14 @@ export default function AdminDashboardView({ user, onNavigate, adminToken }: Adm
           </div>
           <div className="mt-3">
             <div className="flex items-baseline space-x-1">
-              <h3 className="text-2xl font-extrabold text-brand-text font-display">{stats.sla_rate}%</h3>
-              <span className="text-[10px] font-bold text-brand-dim">/ Maqsad 90%</span>
+              <h3 className="text-2xl font-extrabold text-brand-text font-display">{stats.sla_rate != null ? `${stats.sla_rate}%` : '—'}</h3>
+              <span className="text-[10px] font-bold text-brand-dim">{stats.sla_rate != null ? '/ Maqsad 90%' : "Ma'lumot yetarli emas"}</span>
             </div>
             {/* Progress bar */}
             <div className="w-full bg-brand-surface2 h-1.5 rounded-full mt-2.5 overflow-hidden border border-brand-line/50">
               <div
                 className="bg-brand-accent h-full rounded-full transition-all duration-500"
-                style={{ width: `${stats.sla_rate}%` }}
+                style={{ width: `${stats.sla_rate ?? 0}%` }}
               ></div>
             </div>
           </div>
@@ -266,9 +266,10 @@ export default function AdminDashboardView({ user, onNavigate, adminToken }: Adm
                   <tr className="border-b border-brand-line text-[11px] text-brand-dim font-bold uppercase tracking-wider">
                     <th className="pb-2.5">Idora</th>
                     <th className="pb-2.5">SLA darajasi</th>
-                    <th className="pb-2.5 text-center">Jami</th>
+                    <th className="pb-2.5">Bajarilish darajasi</th>
                     <th className="pb-2.5 text-center">Muddati o'tgan</th>
-                    <th className="pb-2.5 text-right">O'rtacha muddat</th>
+                    <th className="pb-2.5 text-center">O'rtacha muddat</th>
+                    <th className="pb-2.5 text-right">Baholash</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-line/40 text-xs font-medium">
@@ -279,18 +280,34 @@ export default function AdminDashboardView({ user, onNavigate, adminToken }: Adm
                         <span className="group-hover:text-brand-accent transition-colors truncate max-w-[150px]">{agency.agency}</span>
                       </td>
                       <td className="py-2.5">
-                        <div className="flex items-center space-x-2.5">
-                          <span className="font-mono font-bold w-10">{agency.sla_rate}%</span>
-                          <div className="w-20 bg-brand-surface2 h-1.5 rounded-full overflow-hidden border border-brand-line/40">
-                            <div className="bg-brand-accent h-full rounded-full" style={{ width: `${agency.sla_rate}%` }}></div>
+                        {agency.sla_rate != null ? (
+                          <div className="flex items-center space-x-2.5">
+                            <span className="font-mono font-bold w-10">{agency.sla_rate}%</span>
+                            <div className="w-16 bg-brand-surface2 h-1.5 rounded-full overflow-hidden border border-brand-line/40">
+                              <div className="bg-brand-accent h-full rounded-full" style={{ width: `${agency.sla_rate}%` }}></div>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <span className="text-brand-dim">—</span>
+                        )}
                       </td>
-                      <td className="py-2.5 text-center font-mono text-brand-muted">{agency.total}</td>
+                      <td className="py-2.5">
+                        {agency.resolution_rate != null ? (
+                          <div className="flex items-center space-x-2.5">
+                            <span className="font-mono font-bold w-10">{agency.resolution_rate}%</span>
+                            <div className="w-16 bg-brand-surface2 h-1.5 rounded-full overflow-hidden border border-brand-line/40">
+                              <div className="bg-[#A78BFA] h-full rounded-full" style={{ width: `${agency.resolution_rate}%` }}></div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-brand-dim">—</span>
+                        )}
+                      </td>
                       <td className="py-2.5 text-center font-mono">
                         <span className={agency.overdue > 0 ? 'text-[#F87171] font-bold' : 'text-brand-dim'}>{agency.overdue}</span>
                       </td>
-                      <td className="py-2.5 text-right font-mono text-brand-muted">{agency.avg_resolution_days} kun</td>
+                      <td className="py-2.5 text-center font-mono text-brand-muted">{agency.avg_resolution_days != null ? `${agency.avg_resolution_days} kun` : '—'}</td>
+                      <td className="py-2.5 text-right font-mono text-brand-muted">{agency.satisfaction_avg != null ? `${agency.satisfaction_avg} ★` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
