@@ -1336,34 +1336,63 @@ app.get("/api/admin/stats/agencies", requireAdminAuth, (req, res) => {
 });
 
 app.get("/api/admin/stats/ai", requireAdminAuth, (req, res) => {
-  const totalClassified = 145;
-  const aiAccepted = 112;
-  const aiOverridden = 23;
-  const fallback = 10;
-  
+  const totalClassified = appealsList.length;
+  const aiAccepted = appealsList.filter(a => (a as any).classification_source === "ai_accepted").length;
+  const aiOverridden = appealsList.filter(a => (a as any).classification_source === "ai_overridden").length;
+  const userSelected = appealsList.filter(a => (a as any).classification_source === "user_selected").length;
+  const fallback = appealsList.filter(a => (a as any).classification_source === "fallback").length;
+
+  // "Acceptance rate" compares how often the AI's own suggestion was kept vs.
+  // overridden — the denominator is suggestions the AI actually made, not the
+  // whole appeal volume (user_selected/fallback never had an AI suggestion to
+  // accept or reject).
+  const suggestionsMade = aiAccepted + aiOverridden;
+  const acceptanceRate = suggestionsMade > 0 ? Math.round((aiAccepted / suggestionsMade) * 100) : 0;
+
+  const avgConfidence = totalClassified > 0
+    ? Number((appealsList.reduce((sum, a) => sum + ((a as any).ai_confidence || 0), 0) / totalClassified).toFixed(2))
+    : 0;
+
+  const byCategory = Object.keys(CATEGORIES_MAPPING).map(cat => {
+    const suggested = appealsList.filter(a => (a as any).ai_suggested_category === cat).length;
+    const overridden = appealsList.filter(a => (a as any).ai_suggested_category === cat && a.category !== cat).length;
+    const accuracy = suggested > 0 ? Math.round(((suggested - overridden) / suggested) * 100) : null;
+    return {
+      category: cat,
+      category_label: CATEGORIES_MAPPING[cat].label,
+      suggested,
+      overridden,
+      accuracy
+    };
+  })
+    .filter(row => row.suggested > 0)
+    .sort((a, b) => (a.accuracy ?? 100) - (b.accuracy ?? 100));
+
+  const bucketDefs: { bucket: string; min: number; max: number }[] = [
+    { bucket: "90-100%", min: 0.90, max: 1.01 },
+    { bucket: "80-89%", min: 0.80, max: 0.90 },
+    { bucket: "70-79%", min: 0.70, max: 0.80 },
+    { bucket: "60-69%", min: 0.60, max: 0.70 },
+    { bucket: "Under 60%", min: 0, max: 0.60 }
+  ];
+  const confidenceBuckets = bucketDefs.map(b => ({
+    bucket: b.bucket,
+    count: appealsList.filter(a => {
+      const c = (a as any).ai_confidence || 0;
+      return c >= b.min && c < b.max;
+    }).length
+  }));
+
   res.json({
     total_classified: totalClassified,
     ai_accepted: aiAccepted,
     ai_overridden: aiOverridden,
-    user_selected: 23,
-    fallback: fallback,
-    acceptance_rate: Math.round((aiAccepted / totalClassified) * 100),
-    avg_confidence: 0.91,
-    by_category: [
-      { category: "street_lighting", category_label: "Ko'cha yoritish", suggested: 34, overridden: 2, accuracy: 94 },
-      { category: "water_supply", category_label: "Ichimlik suvi", suggested: 28, overridden: 1, accuracy: 96 },
-      { category: "waste", category_label: "Chiqindi va tozalash", suggested: 22, overridden: 3, accuracy: 86 },
-      { category: "roads", category_label: "Yo'llarni ta'mirlash", suggested: 31, overridden: 8, accuracy: 74 },
-      { category: "healthcare", category_label: "Tibbiyot xizmatlari", suggested: 15, overridden: 1, accuracy: 93 },
-      { category: "other", category_label: "Boshqa muammolar", suggested: 15, overridden: 8, accuracy: 46 }
-    ],
-    confidence_buckets: [
-      { bucket: "90-100%", count: 85 },
-      { bucket: "80-89%", count: 32 },
-      { bucket: "70-79%", count: 18 },
-      { bucket: "60-69%", count: 7 },
-      { bucket: "Under 60%", count: 3 }
-    ]
+    user_selected: userSelected,
+    fallback,
+    acceptance_rate: acceptanceRate,
+    avg_confidence: avgConfidence,
+    by_category: byCategory,
+    confidence_buckets: confidenceBuckets
   });
 });
 
