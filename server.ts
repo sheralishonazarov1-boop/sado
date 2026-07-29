@@ -249,9 +249,16 @@ app.post("/api/ai/classify", requireAuth, async (req, res) => {
     return res.status(400).json({ detail: "Matn juda qisqa yoki bo'sh." });
   }
 
+  const PRIORITY_LABELS: { [k: string]: string } = { high: "Yuqori", medium: "O'rta", low: "Past" };
+
   // Check if Gemini API is available
   if (ai) {
     try {
+      // The AI is only ever asked to classify the problem into a category and
+      // judge its priority — it is never asked for, and never gets to choose,
+      // which agency handles it. Routing is a deterministic lookup in
+      // CATEGORIES_MAPPING a hokimlik administrator can edit without touching
+      // the model. See CLAUDE.md 5.1.
       const prompt = `Foydalanuvchi yozgan ushbu shikoyat matnini tahlil qil: "${text}".
 Quyidagi kategoriyalardan eng mosini tanla:
 1. street_lighting (Ko'cha yoritish muammolari)
@@ -268,22 +275,10 @@ Quyidagi kategoriyalardan eng mosini tanla:
 Javobni aniq JSON formatida qaytar. Schema:
 {
   "category": "kategoriya_kodi",
-  "category_label": "Kategoriya o'zbekcha nomi",
-  "agency_id": 1_dan_6_gacha_son,
-  "agency_name": "Tegishli davlat idorasi nomi",
   "priority": "low" | "medium" | "high",
-  "priority_label": "Muhimlik darajasi (Past, O'rta, Yuqori)",
   "summary": "Murojaatning juda qisqa va tushunarli o'zbekcha 1 qatorli mazmuni",
   "confidence": 0.0_va_1.0_orasida_son
 }
-
-Tegishli idoralar ro'yxati:
-1: Hokimlik (boshqa turdagi yoki umumiy masalalar)
-2: Kommunal xizmat (suv, yorug'lik, kanalizatsiya, chiqindi, gaz, issiqlik)
-3: Sog'liqni saqlash (tibbiyot, poliklinikalar)
-4: Yo'llar boshqarmasi (yo'l chuqurlari, asfalt)
-5: Maktabgacha ta'lim (bog'cha)
-6: Ichki ishlar (tartib-intizom)
 
 Faqat JSON qaytarilsin va hech qanday markdown formatlash (masalan, \`\`\`json) qo'shilmasin, to'g'ridan-to'g'ri valid parsable JSON bo'lsin.`;
 
@@ -295,43 +290,46 @@ Faqat JSON qaytarilsin va hech qanday markdown formatlash (masalan, \`\`\`json) 
             type: Type.OBJECT,
             properties: {
               category: { type: Type.STRING },
-              category_label: { type: Type.STRING },
-              agency_id: { type: Type.INTEGER },
-              agency_name: { type: Type.STRING },
               priority: { type: Type.STRING },
-              priority_label: { type: Type.STRING },
               summary: { type: Type.STRING },
               confidence: { type: Type.NUMBER }
             },
-            required: ["category", "category_label", "agency_id", "agency_name", "priority", "priority_label", "summary", "confidence"]
+            required: ["category", "priority", "summary", "confidence"]
           }
         }
       });
 
       const data = JSON.parse(response.text?.trim() || "{}");
-      
-      const agencySlug = AGENCIES.find(a => a.id === data.agency_id)?.slug || "hokimlik";
 
-      return res.json({
-        category: data.category,
-        category_label: data.category_label,
-        agency: {
-          id: data.agency_id,
-          name: data.agency_name,
-          slug: agencySlug
-        },
-        priority: data.priority,
-        priority_label: data.priority_label,
-        summary: data.summary,
-        confidence: data.confidence,
-        source: "ai_accepted"
-      });
+      const categoryValid = typeof data.category === "string" && Object.prototype.hasOwnProperty.call(CATEGORIES_MAPPING, data.category);
+      const priorityValid = data.priority === "low" || data.priority === "medium" || data.priority === "high";
+
+      if (categoryValid && priorityValid) {
+        // Agency is derived here, deterministically — the model's response has
+        // no agency_id/agency_name field to ignore in the first place.
+        const mapping = CATEGORIES_MAPPING[data.category];
+        const agencyObj = AGENCIES.find(a => a.id === mapping.agencyId) || AGENCIES[0];
+
+        return res.json({
+          category: data.category,
+          category_label: mapping.label,
+          agency: agencyObj,
+          priority: data.priority,
+          priority_label: PRIORITY_LABELS[data.priority],
+          summary: data.summary || text.substring(0, 45),
+          confidence: typeof data.confidence === "number" ? data.confidence : 0.75,
+          source: "ai_accepted"
+        });
+      }
+
+      console.error("Gemini returned an invalid category/priority, falling back to rules-based classification:", data);
     } catch (err) {
       console.error("Gemini classification failed, using rules-based local classification:", err);
     }
   }
 
-  // Rules-based fallback (or if Gemini key missing/fails)
+  // Rules-based fallback: Gemini key missing, the call failed, or its response
+  // didn't validate against the ten allowed categories / three priorities.
   const { category: cat, priority } = classifyByKeywords(text);
 
   const mapping = CATEGORIES_MAPPING[cat];
@@ -344,10 +342,10 @@ Faqat JSON qaytarilsin va hech qanday markdown formatlash (masalan, \`\`\`json) 
     category_label: mapping.label,
     agency: agencyObj,
     priority,
-    priority_label: priority === "high" ? "Yuqori" : "O'rta",
+    priority_label: PRIORITY_LABELS[priority],
     summary: summaryText,
     confidence: 0.85,
-    source: "ai_accepted"
+    source: "fallback"
   });
 });
 
