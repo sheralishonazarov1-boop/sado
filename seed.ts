@@ -189,6 +189,15 @@ export const CATEGORIES_MAPPING: { [key: string]: { label: string; agencyId: num
   other: { label: "Boshqa muammolar", agencyId: 1 } // Hokimlik
 };
 
+// Minutes-ago instead of a hardcoded date, so last_login_at always reads as
+// "today" no matter which morning the server actually starts up on — same
+// reasoning as the rest of this module.
+function minutesAgo(m: number): string {
+  return new Date(Date.now() - m * 60 * 1000).toISOString();
+}
+
+// 1 super admin + 6 agency admins + 6 operators (one admin and one operator
+// per agency) = 13, per TASKS.md T8. <slug>.admin / <slug>.operator naming.
 export const adminUsers: any[] = [
   {
     id: 1,
@@ -198,57 +207,127 @@ export const adminUsers: any[] = [
     role: "super_admin",
     is_active: true,
     agency: { id: 1, name: "Hokimlik", slug: "hokimlik" },
-    last_login_at: "2026-07-28T09:14:00Z"
+    last_login_at: minutesAgo(12)
   },
   {
     id: 2,
+    username: "hokimlik.admin",
+    password: "admin123",
+    full_name: "Farrux Mirzayev",
+    role: "agency_admin",
+    is_active: true,
+    agency: { id: 1, name: "Hokimlik", slug: "hokimlik" },
+    last_login_at: minutesAgo(40)
+  },
+  {
+    id: 3,
+    username: "hokimlik.operator",
+    password: "operator123",
+    full_name: "Zarina Ahmedova",
+    role: "operator",
+    is_active: true,
+    agency: { id: 1, name: "Hokimlik", slug: "hokimlik" },
+    last_login_at: minutesAgo(130)
+  },
+  {
+    id: 4,
     username: "kommunal.admin",
     password: "admin123",
     full_name: "Bekzod Yusupov",
     role: "agency_admin",
     is_active: true,
     agency: { id: 2, name: "Kommunal xizmat", slug: "kommunal" },
-    last_login_at: "2026-07-28T09:10:00Z"
+    last_login_at: minutesAgo(18)
   },
   {
-    id: 3,
+    id: 5,
     username: "kommunal.operator",
     password: "operator123",
     full_name: "Nilufar Qosimova",
     role: "operator",
     is_active: true,
     agency: { id: 2, name: "Kommunal xizmat", slug: "kommunal" },
-    last_login_at: "2026-07-28T08:05:00Z"
+    last_login_at: minutesAgo(95)
   },
   {
-    id: 4,
+    id: 6,
     username: "soglik.admin",
     password: "admin123",
     full_name: "Dilnoza Karimova",
     role: "agency_admin",
     is_active: true,
     agency: { id: 3, name: "Sog'liqni saqlash", slug: "soglik" },
-    last_login_at: "2026-07-27T14:20:00Z"
+    last_login_at: minutesAgo(340)
   },
   {
-    id: 5,
+    id: 7,
+    username: "soglik.operator",
+    password: "operator123",
+    full_name: "Shahnoza Rustamova",
+    role: "operator",
+    is_active: true,
+    agency: { id: 3, name: "Sog'liqni saqlash", slug: "soglik" },
+    last_login_at: minutesAgo(25)
+  },
+  {
+    id: 8,
     username: "yollar.admin",
     password: "admin123",
     full_name: "Jasur Ergashiv",
     role: "agency_admin",
     is_active: true,
     agency: { id: 4, name: "Yo'llar boshqarmasi", slug: "yollar" },
-    last_login_at: "2026-07-28T07:15:00Z"
+    last_login_at: minutesAgo(60)
   },
   {
-    id: 6,
+    id: 9,
     username: "yollar.operator",
     password: "operator123",
     full_name: "Xurshid Karimov",
     role: "operator",
     is_active: true,
     agency: { id: 4, name: "Yo'llar boshqarmasi", slug: "yollar" },
-    last_login_at: "2026-07-28T07:30:00Z"
+    last_login_at: minutesAgo(70)
+  },
+  {
+    id: 10,
+    username: "maktabgacha.admin",
+    password: "admin123",
+    full_name: "Alisher Nazarov",
+    role: "agency_admin",
+    is_active: true,
+    agency: { id: 5, name: "Maktabgacha ta'lim", slug: "maktabgacha" },
+    last_login_at: minutesAgo(200)
+  },
+  {
+    id: 11,
+    username: "maktabgacha.operator",
+    password: "operator123",
+    full_name: "Gulnora Tosheva",
+    role: "operator",
+    is_active: true,
+    agency: { id: 5, name: "Maktabgacha ta'lim", slug: "maktabgacha" },
+    last_login_at: minutesAgo(15)
+  },
+  {
+    id: 12,
+    username: "ichki_ishlar.admin",
+    password: "admin123",
+    full_name: "Davron Xolmatov",
+    role: "agency_admin",
+    is_active: true,
+    agency: { id: 6, name: "Ichki ishlar", slug: "ichki_ishlar" },
+    last_login_at: minutesAgo(500)
+  },
+  {
+    id: 13,
+    username: "ichki_ishlar.operator",
+    password: "operator123",
+    full_name: "Rustam Sodiqov",
+    role: "operator",
+    is_active: true,
+    agency: { id: 6, name: "Ichki ishlar", slug: "ichki_ishlar" },
+    last_login_at: minutesAgo(45)
   }
 ];
 
@@ -665,7 +744,7 @@ function buildCentrepiece(id: number): { appeal: any; timeline: any[] } {
   const priority = "high";
   const deadline = new Date(createdAt.getTime() + PRIORITY_DAYS[priority] * 24 * 60 * 60 * 1000);
   const isOverdue = deadline.getTime() < NOW.getTime();
-  const assignedTo = { id: 3, full_name: "Nilufar Qosimova" };
+  const assignedTo = { id: 5, full_name: "Nilufar Qosimova" };
   const escalatedAt = new Date(createdAt.getTime() + 3 * 24 * 60 * 60 * 1000);
 
   const appeal = {
