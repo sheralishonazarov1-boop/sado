@@ -886,6 +886,19 @@ function logAudit(actor: any, action: string, target_type: string, target_id: st
   });
 }
 
+// Never let a password (hashed or not) leave the server in a user object.
+function toPublicUser(u: any) {
+  return {
+    id: u.id,
+    username: u.username,
+    full_name: u.full_name,
+    role: u.role,
+    is_active: u.is_active,
+    agency: u.agency,
+    last_login_at: u.last_login_at
+  };
+}
+
 // Admin Auth Middleware
 const requireAdminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -922,11 +935,11 @@ app.post("/api/admin/auth/login", (req, res) => {
 
   logAudit(user, "login", "auth", String(user.id), "Muvaffaqiyatli kirildi");
 
-  res.json({ token, user });
+  res.json({ token, user: toPublicUser(user) });
 });
 
 app.get("/api/admin/auth/me", requireAdminAuth, (req, res) => {
-  res.json((req as any).adminUser);
+  res.json(toPublicUser((req as any).adminUser));
 });
 
 app.post("/api/admin/auth/logout", requireAdminAuth, (req, res) => {
@@ -1418,7 +1431,7 @@ app.get("/api/admin/users", requireAdminAuth, (req, res) => {
     items = items.filter(u => u.full_name.toLowerCase().includes(search) || u.username.toLowerCase().includes(search));
   }
 
-  res.json({ items });
+  res.json({ items: items.map(toPublicUser) });
 });
 
 app.post("/api/admin/users", requireAdminAuth, (req, res) => {
@@ -1462,7 +1475,7 @@ app.post("/api/admin/users", requireAdminAuth, (req, res) => {
   adminUsers.push(newStaff);
   logAudit(creator, "create_user", "user", String(newId), `Yangi xodim yaratildi: ${full_name} (${role})`);
 
-  res.status(201).json(newStaff);
+  res.status(201).json(toPublicUser(newStaff));
 });
 
 app.patch("/api/admin/users/:id", requireAdminAuth, (req, res) => {
@@ -1489,7 +1502,7 @@ app.patch("/api/admin/users/:id", requireAdminAuth, (req, res) => {
 
   logAudit(actor, "edit_user", "user", String(id), `Xodim ma'lumotlari tahrirlandi: ${target.full_name}`);
 
-  res.json(target);
+  res.json(toPublicUser(target));
 });
 
 app.post("/api/admin/users/:id/reset-password", requireAdminAuth, (req, res) => {
